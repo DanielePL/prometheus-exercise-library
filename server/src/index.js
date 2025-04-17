@@ -395,6 +395,13 @@ app.post('/api/check-duplicates', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 app.listen(5000, () => {
   console.log('Server running on port 5000');
 });// test comment
+=======
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+>>>>>>> 3f715854ab149d29ff44c7be9a3cf19262c8cbc8
