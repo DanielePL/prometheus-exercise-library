@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
-const Dashboard = ({ exercises, setViewMode }) => {
+const Dashboard = ({
+  exercises,
+  setViewMode,
+  setShowAddExerciseForm,
+  setShowAiSearchModal,
+  onFindDuplicates
+}) => {
   // Calculate some basic stats
   const totalExercises = exercises.length;
   const approvedExercises = exercises.filter(ex => ex.approved).length;
@@ -111,9 +117,98 @@ const Dashboard = ({ exercises, setViewMode }) => {
             </div>
           </div>
         </div>
+
+        {/* Extra widgets row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          {/* Equipment distribution widget */}
+          <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
+            <div className="p-3 border-b border-gray-800 bg-gray-950">
+              <h3 className="font-bold text-white">Equipment Usage</h3>
+            </div>
+            <div className="p-4">
+              <div className="space-y-3">
+                {getEquipmentStats(exercises).map((item, index) => (
+                  <div key={index}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-300">{item.name}</span>
+                      <span className="text-gray-400">{item.count} exercises</span>
+                    </div>
+                    <div className="w-full bg-gray-800 rounded-full h-2.5">
+                      <div
+                        className="bg-blue-600 h-2.5 rounded-full"
+                        style={{ width: `${item.percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Exercise difficulty distribution */}
+          <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
+            <div className="p-3 border-b border-gray-800 bg-gray-950">
+              <h3 className="font-bold text-white">Quick Actions</h3>
+            </div>
+            <div className="p-4">
+              <div className="space-y-3">
+                <button
+                  className="w-full bg-green-800 hover:bg-green-700 text-white p-3 rounded flex items-center"
+                  onClick={() => setViewMode('library')}
+                >
+                  <span className="mr-2">🔍</span> Find Exercises by Muscle Group
+                </button>
+                <button
+                  className="w-full bg-purple-800 hover:bg-purple-700 text-white p-3 rounded flex items-center"
+                >
+                  <span className="mr-2">📊</span> View Exercise Statistics
+                </button>
+                <button
+                  className="w-full bg-indigo-800 hover:bg-indigo-700 text-white p-3 rounded flex items-center"
+                >
+                  <span className="mr-2">⭐</span> View Favorite Exercises
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
+
+// Helper function to get equipment statistics
+function getEquipmentStats(exercises) {
+  const equipmentMap = {};
+  let totalCount = 0;
+
+  // Count exercises by equipment
+  exercises.forEach(exercise => {
+    if (exercise.equipment) {
+      let equipment = Array.isArray(exercise.equipment) ? exercise.equipment : [exercise.equipment];
+      equipment.forEach(item => {
+        const equipName = item.trim();
+        if (equipName) {
+          equipmentMap[equipName] = (equipmentMap[equipName] || 0) + 1;
+          totalCount++;
+        }
+      });
+    } else {
+      // Count exercises with no equipment as "Bodyweight"
+      equipmentMap["Bodyweight"] = (equipmentMap["Bodyweight"] || 0) + 1;
+      totalCount++;
+    }
+  });
+
+  // Convert to array and calculate percentages
+  return Object.entries(equipmentMap)
+    .map(([name, count]) => ({
+      name,
+      count,
+      percentage: Math.round((count / totalCount) * 100)
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5); // Get top 5
+}
 
 export default Dashboard;
