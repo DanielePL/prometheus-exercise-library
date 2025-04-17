@@ -4,7 +4,7 @@
   "description": "Exercise library for Prometheus fitness app",
   "main": "server/src/index.js",
   "scripts": {
-    "start": "node server/src/index.js",
+    "start": "npm install && node server/src/index.js",
     "server": "nodemon server/src/index.js",
     "client": "cd client && npm start",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
