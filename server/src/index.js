@@ -218,11 +218,11 @@ app.get('/api/debug-info', (req, res) => {
   });
 });
 
-// Root route - change to redirect to frontend in production
+// Root route - should serve API info in development, React app in production
 app.get('/', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
-    console.log('Redirecting to React app from root endpoint');
-    res.redirect('/app');
+    console.log('Serving React app from root in production');
+    res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
   } else {
     res.send('Prometheus Exercise Library API is running');
   }
@@ -1021,11 +1021,13 @@ app.get('/api/user', authenticate, async (req, res) => {
 // Serve static files from the React app in production
 if (process.env.NODE_ENV === 'production') {
   console.log('Setting up static file serving for production');
+  
   // Serve static files from the React frontend app
-  app.use('/app', express.static(path.join(__dirname, '../../client/build')));
+  app.use(express.static(path.join(__dirname, '../../client/build')));
 
   // Handle React routing, return all requests to React app
-  app.get('/app/*', (req, res) => {
+  // This should be AFTER API routes and BEFORE 404 handler
+  app.get('*', (req, res) => {
     console.log('Serving React app for path:', req.path);
     res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
   });

@@ -13,14 +13,6 @@ const getBaseUrl = () => {
 
 const API_URL = getBaseUrl();
 
-// Create URL with proper app path in production
-const getAppUrl = (path) => {
-  if (process.env.NODE_ENV === 'production') {
-    return `/app${path}`;
-  }
-  return path;
-};
-
 const CONFIG = {
   // API Endpoints
   API: {
@@ -34,11 +26,6 @@ const CONFIG = {
       REGISTER: `${API_URL}/api/auth/register`,
       PROFILE: `${API_URL}/api/auth/profile`,
     }
-  },
-  
-  // App URLs
-  APP: {
-    getPath: getAppUrl
   },
   
   // Other configuration settings
