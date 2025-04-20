@@ -1,30 +1,36 @@
-// Configuration file for the application
+// Configuration file for API endpoints and other settings
 
-// Check if we're running in Electron
-const isElectron = () => {
-  // Renderer process
-  if (typeof window !== 'undefined' && typeof window.process === 'object' && window.process.type === 'renderer') {
-    return true;
+// Determine the base API URL based on environment
+const getBaseUrl = () => {
+  // For local development, use localhost
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3001';
   }
   
-  // Main process
-  if (typeof process !== 'undefined' && typeof process.versions === 'object' && !!process.versions.electron) {
-    return true;
-  }
-  
-  // Detect the user agent when the `nodeIntegration` option is set to false
-  if (typeof navigator === 'object' && typeof navigator.userAgent === 'string' && navigator.userAgent.indexOf('Electron') >= 0) {
-    return true;
-  }
-  
-  return false;
+  // For production, use relative URL to the same domain
+  return '';
 };
 
-// Set API URL based on environment
-const API_URL = isElectron() 
-  ? 'http://localhost:3001/api' // Use localhost in Electron
-  : process.env.REACT_APP_API_URL || 'http://localhost:3001/api'; // Use env variable or default in web app
+const API_URL = getBaseUrl();
 
-export default {
-  API_URL
-}; 
+const CONFIG = {
+  // API Endpoints
+  API: {
+    BASE_URL: API_URL,
+    EXERCISES: `${API_URL}/api/exercises`,
+    WORKOUTS: `${API_URL}/api/workouts`,
+    GENERATE_WORKOUT: `${API_URL}/api/workouts/generate`,
+    IMPORT_WORKOUT: `${API_URL}/api/workouts/import`,
+    AUTH: {
+      LOGIN: `${API_URL}/api/auth/login`,
+      REGISTER: `${API_URL}/api/auth/register`,
+      PROFILE: `${API_URL}/api/auth/profile`,
+    }
+  },
+  
+  // Other configuration settings
+  DEFAULT_PAGINATION_LIMIT: 20,
+  WORKOUT_TYPES: ['bodybuilding', 'powerlifting', 'crossfit', 'olympic_weightlifting', 'hyrox', 'hiit', 'calisthenics', 'yoga', 'general']
+};
+
+export default CONFIG; 
