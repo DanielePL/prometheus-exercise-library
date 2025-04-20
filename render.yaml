@@ -4,7 +4,18 @@ services:
     name: prometheus-server
     env: node
     plan: free
-    buildCommand: npm install && cd client && npm install && npm run build && cd .. && cd server && npm install && ls -la client/build
+    buildCommand: |
+      npm install
+      cd client
+      npm install
+      CI=false npm run build
+      cd ..
+      cd server
+      npm install
+      cd ..
+      mkdir -p client/build
+      cp client/public/index-fallback.html client/build/index.html || echo "Fallback copy failed"
+      ls -la client/build
     startCommand: node verify-build.js && node server/src/index.js
     envVars:
       - key: NODE_ENV

@@ -239,19 +239,24 @@ app.get('/', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     console.log('Serving React app from root in production');
     const indexPath = path.join(__dirname, '../../client/build/index.html');
+    const fallbackPath = path.join(__dirname, '../../client/public/index-fallback.html');
     
     // Check if index.html exists
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
+    } else if (fs.existsSync(fallbackPath)) {
+      // Use fallback if available
+      console.log('Using fallback HTML');
+      res.sendFile(fallbackPath);
     } else {
-      // Fallback if index.html doesn't exist
+      // Plain HTML fallback if neither file exists
       res.send(`
         <html>
           <head><title>Prometheus Library</title></head>
-          <body>
-            <h1>Prometheus Library API is running</h1>
+          <body style="font-family: sans-serif; background-color: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center;">
+            <h1 style="color: #ff5722; font-size: 32px;">Prometheus Library API</h1>
             <p>The React frontend could not be found.</p>
-            <p>Please check build configurations or <a href="/api/debug-info">Debug Info</a>.</p>
+            <p>Please check build configurations or <a href="/api/debug-info" style="color: #ff5722;">Debug Info</a>.</p>
           </body>
         </html>
       `);
