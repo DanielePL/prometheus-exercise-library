@@ -4,7 +4,7 @@ services:
     name: prometheus-server
     env: node
     plan: free
-    buildCommand: npm install && cd client && npm install && npm run build && cd ..
+    buildCommand: npm install && cd client && npm install && npm run build && cd .. && cd server && npm install
     startCommand: node server/src/index.js
     envVars:
       - key: NODE_ENV
@@ -15,4 +15,6 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: JWT_SECRET
+        value: "prometheus_secure_jwt_key_for_authentication"
     healthCheckPath: /api/health 
