@@ -1,9 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Dashboard from './Dashboard';
+import config from '../config';
 
-// API client functions
-const API_URL = 'http://localhost:5000/api';
+// API client functions with proper config
+const API_URL = config.API_URL;
+
+// Configure axios defaults
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+axios.defaults.timeout = 60000; // 60 second timeout for API calls
+
+// Add a response interceptor for better error handling
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Status code:', error.response.status);
+    }
+    return Promise.reject(error);
+  }
+);
 
 const getExercises = async (filters = {}) => {
   const { muscleGroup, category, search } = filters;
@@ -34,7 +52,7 @@ const deleteExercise = async (id) => {
 };
 
 // Main component
-export default function ExerciseLibrary() {
+export default function ExerciseLibrary({ user, onLogout }) {
   // State for exercises
   const [exercises, setExercises] = useState([]);
   const [filteredExercises, setFilteredExercises] = useState([]);
@@ -48,6 +66,13 @@ export default function ExerciseLibrary() {
   const [loading, setLoading] = useState(true);
   const exercisesPerPage = 9;
 
+  // State for workout search
+  const [showWorkoutSearchModal, setShowWorkoutSearchModal] = useState(false);
+  const [workoutType, setWorkoutType] = useState('crossfit');
+  const [workoutSearchTerm, setWorkoutSearchTerm] = useState('');
+  const [workoutSearchResults, setWorkoutSearchResults] = useState([]);
+  const [workoutSearchLoading, setWorkoutSearchLoading] = useState(false);
+
   // State for AI search
   const [showAiSearchModal, setShowAiSearchModal] = useState(false);
   const [aiSearchTerm, setAiSearchTerm] = useState('');
@@ -55,7 +80,14 @@ export default function ExerciseLibrary() {
   const [aiSearchLoading, setAiSearchLoading] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
 
-  // View mode state (dashboard or library)
+  // State for saved workouts
+  const [savedWorkouts, setSavedWorkouts] = useState([]);
+  const [filteredWorkouts, setFilteredWorkouts] = useState([]);
+  const [workoutSearchText, setWorkoutSearchText] = useState('');
+  const [selectedWorkoutCategory, setSelectedWorkoutCategory] = useState('All');
+  const [loadingWorkouts, setLoadingWorkouts] = useState(false);
+
+  // View mode state (dashboard, library, or workouts)
   const [viewMode, setViewMode] = useState('dashboard');
 
   // State for duplicate handling
@@ -171,6 +203,24 @@ const getYouTubeThumbnail = (url) => {
     fetchExercises();
   }, []);
 
+  // Fetch saved workouts
+  useEffect(() => {
+    const fetchSavedWorkouts = async () => {
+      try {
+        setLoadingWorkouts(true);
+        const response = await axios.get(`${API_URL}/workouts`);
+        setSavedWorkouts(response.data);
+        setFilteredWorkouts(response.data);
+      } catch (error) {
+        console.error('Error fetching workouts:', error);
+      } finally {
+        setLoadingWorkouts(false);
+      }
+    };
+
+    fetchSavedWorkouts();
+  }, []);
+
   // Apply filters
   useEffect(() => {
     const applyFilters = async () => {
@@ -197,6 +247,24 @@ const getYouTubeThumbnail = (url) => {
 
     return () => clearTimeout(timer);
   }, [searchTerm, selectedMuscleGroup, selectedCategory]);
+
+  // Filter workouts based on search and category
+  useEffect(() => {
+    if (savedWorkouts.length === 0) return;
+    
+    const filtered = savedWorkouts.filter(workout => {
+      const matchesSearch = workoutSearchText === '' || 
+        workout.name.toLowerCase().includes(workoutSearchText.toLowerCase()) ||
+        (workout.description && workout.description.toLowerCase().includes(workoutSearchText.toLowerCase()));
+      
+      const matchesCategory = selectedWorkoutCategory === 'All' || 
+        workout.category === selectedWorkoutCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
+    
+    setFilteredWorkouts(filtered);
+  }, [workoutSearchText, selectedWorkoutCategory, savedWorkouts]);
 
   // Add new exercise
   const addExercise = async (newExercise) => {
@@ -356,6 +424,81 @@ const getYouTubeThumbnail = (url) => {
     }
   };
 
+  // Add these with your other handler functions
+const handleWorkoutSearch = async () => {
+  // Allow empty search terms by not validating here
+  setWorkoutSearchLoading(true);
+  try {
+    console.log("Searching for workouts:", workoutSearchTerm || "general", "Type:", workoutType);
+    
+    const response = await axios.post(`${API_URL}/ai-workout-search`, {
+      searchTerm: workoutSearchTerm || workoutType, // Use workout type as fallback if no search term
+      workoutType: workoutType
+    });
+
+    console.log("Workout search response:", response.data);
+
+    if (response.data.success) {
+      if (response.data.workouts && response.data.workouts.length > 0) {
+        setWorkoutSearchResults(response.data.workouts);
+      } else {
+        setWorkoutSearchResults([]);
+        alert("No workouts found. Please try different search terms.");
+      }
+    } else {
+      console.error("Error from workout search API:", response.data.error);
+      // Still use fallback workouts if provided
+      if (response.data.workouts && response.data.workouts.length > 0) {
+        setWorkoutSearchResults(response.data.workouts);
+      } else {
+        setWorkoutSearchResults([]);
+        alert("Failed to find workouts. Please try different search terms.");
+      }
+    }
+  } catch (error) {
+    console.error("Error searching for workouts:", error);
+    setWorkoutSearchResults([]);
+    alert(`An error occurred while searching for workouts: ${error.message}`);
+  } finally {
+    setWorkoutSearchLoading(false);
+  }
+};
+
+const saveWorkout = async (workout) => {
+  try {
+    console.log("Saving workout:", workout);
+    const response = await axios.post(`${API_URL}/workouts`, {
+      ...workout,
+      category: workoutType.charAt(0).toUpperCase() + workoutType.slice(1),
+      source: 'AI Generated'
+    });
+
+    if (response.data.success) {
+      alert(`Workout "${workout.name}" saved to library!`);
+      
+      // Update the workout list with the newly saved workout
+      setSavedWorkouts([response.data.workout, ...savedWorkouts]);
+      
+      // If the current view is workouts and the category filter matches, also update filtered workouts
+      if (viewMode === 'workouts' && 
+          (selectedWorkoutCategory === 'All' || 
+           selectedWorkoutCategory === workoutType.charAt(0).toUpperCase() + workoutType.slice(1))) {
+        setFilteredWorkouts([response.data.workout, ...filteredWorkouts]);
+      }
+      
+      // Close the search modal
+      setShowWorkoutSearchModal(false);
+    } else {
+      console.error("Error from server:", response.data.error);
+      alert(`Failed to save workout: ${response.data.error}`);
+    }
+  } catch (error) {
+    console.error("Error saving workout:", error);
+    const errorMessage = error.response?.data?.error || error.message;
+    alert(`Failed to save workout: ${errorMessage}`);
+  }
+};
+
   // AI search function
   const searchExercisesWithAI = async (searchTerm) => {
     try {
@@ -394,6 +537,26 @@ const getYouTubeThumbnail = (url) => {
     }
   };
 
+  // Handle deleting a workout
+  const handleDeleteWorkout = async (id) => {
+    try {
+      if (!window.confirm('Are you sure you want to delete this workout?')) {
+        return;
+      }
+      
+      await axios.delete(`${API_URL}/workouts/${id}`);
+      
+      // Update local state
+      setSavedWorkouts(savedWorkouts.filter(workout => workout._id !== id));
+      setFilteredWorkouts(filteredWorkouts.filter(workout => workout._id !== id));
+      
+      alert('Workout deleted successfully');
+    } catch (error) {
+      console.error('Error deleting workout:', error);
+      alert('Failed to delete workout');
+    }
+  };
+
   // Render the exercise library
   return (
     <div className="flex flex-col h-screen bg-black text-white">
@@ -418,6 +581,19 @@ const getYouTubeThumbnail = (url) => {
             >
               Exercise Library
             </button>
+            <button
+              className={`mr-4 px-3 py-1 rounded ${viewMode === 'workouts' ? 'bg-gray-700 text-white' : 'bg-gray-900 text-gray-400'}`}
+              onClick={() => setViewMode('workouts')}
+            >
+              Workout Library
+            </button>
+
+            <button
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded flex items-center gap-2"
+              onClick={() => setShowWorkoutSearchModal(true)}
+            >
+              🏋️ AI Workout Search
+            </button>
 
             <button
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded flex items-center gap-2"
@@ -437,6 +613,31 @@ const getYouTubeThumbnail = (url) => {
             >
               + Add Exercise
             </button>
+            
+            {/* User Profile and Logout */}
+            <div className="ml-4 flex items-center">
+              <div className="relative group">
+                <button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-full">
+                  <span className="text-white">{user?.username || 'User'}</span>
+                  <span className="bg-orange-500 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                    {user?.username?.[0]?.toUpperCase() || 'U'}
+                  </span>
+                </button>
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 p-1 hidden group-hover:block z-10">
+                  <div className="py-1">
+                    <p className="px-4 py-2 text-sm text-gray-300 border-b border-gray-700">
+                      Signed in as <span className="font-medium text-white">{user?.username}</span>
+                    </p>
+                    <button
+                      onClick={onLogout}
+                      className="w-full text-left block px-4 py-2 text-sm text-red-400 hover:bg-gray-700 rounded"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -450,7 +651,7 @@ const getYouTubeThumbnail = (url) => {
           setShowAiSearchModal={setShowAiSearchModal}
           onFindDuplicates={handleFindDuplicates}
         />
-      ) : (
+      ) : viewMode === 'library' ? (
         /* Library view */
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
@@ -692,6 +893,153 @@ const getYouTubeThumbnail = (url) => {
                   </div>
                 )}
               </>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Workout library view */
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-64 bg-gray-900 p-4 flex flex-col">
+            {/* Search */}
+            <div className="mb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search workouts..."
+                  className="w-full p-2 pl-8 bg-gray-800 border border-gray-700 rounded text-white"
+                  value={workoutSearchText}
+                  onChange={(e) => setWorkoutSearchText(e.target.value)}
+                />
+                <span className="absolute left-2 top-2.5 text-gray-500">🔍</span>
+              </div>
+            </div>
+
+            {/* Category filter */}
+            <div className="mb-4">
+              <h3 className="font-medium mb-2 text-orange-500">Category</h3>
+              <select
+                className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
+                value={selectedWorkoutCategory}
+                onChange={(e) => setSelectedWorkoutCategory(e.target.value)}
+              >
+                <option value="All">All Categories</option>
+                <option value="CrossFit">CrossFit</option>
+                <option value="Strength">Strength Training</option>
+                <option value="HIIT">HIIT</option>
+                <option value="Bodybuilding">Bodybuilding</option>
+                <option value="Powerlifting">Powerlifting</option>
+                <option value="Weightlifting">Olympic Weightlifting</option>
+                <option value="Hyrox">Hyrox</option>
+                <option value="Endurance">Endurance</option>
+                <option value="Functional">Functional Training</option>
+              </select>
+            </div>
+
+            {/* AI Workout Search button */}
+            <div className="mb-4">
+              <button
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded flex items-center justify-center gap-2"
+                onClick={() => setShowWorkoutSearchModal(true)}
+              >
+                🏋️ AI Workout Search
+              </button>
+            </div>
+
+            {/* Stats */}
+            <div className="mt-4 bg-gray-800 p-3 rounded">
+              <p className="text-sm text-gray-400">
+                {filteredWorkouts.length} workouts found
+              </p>
+            </div>
+          </div>
+
+          {/* Workout list */}
+          <div className="flex-1 p-4 overflow-auto bg-gray-950">
+            {loadingWorkouts ? (
+              <div className="flex justify-center items-center h-full">
+                <div className="text-purple-500">Loading workouts...</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
+                {filteredWorkouts.length > 0 ? (
+                  filteredWorkouts.map(workout => (
+                    <div key={workout._id} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 p-5">
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="text-xl font-bold text-white">{workout.name}</h3>
+                        <div>
+                          <button
+                            className="bg-red-800 text-white rounded-full p-1 opacity-70 hover:opacity-100"
+                            onClick={() => handleDeleteWorkout(workout._id)}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <p className="text-gray-300 mb-4">{workout.description}</p>
+                      
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <span className="bg-gray-800 text-purple-500 text-xs px-2 py-1 rounded border border-purple-500/20">
+                          {workout.category}
+                        </span>
+                        <span className="bg-gray-800 text-blue-500 text-xs px-2 py-1 rounded border border-blue-500/20">
+                          {workout.type || 'Custom'}
+                        </span>
+                        {workout.difficulty && (
+                          <span className="bg-gray-800 text-orange-500 text-xs px-2 py-1 rounded border border-orange-500/20">
+                            {workout.difficulty}
+                          </span>
+                        )}
+                        {workout.estimatedTime && (
+                          <span className="bg-gray-800 text-green-500 text-xs px-2 py-1 rounded border border-green-500/20">
+                            {workout.estimatedTime}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="mb-4">
+                        <h4 className="font-medium text-white mb-2">Exercises:</h4>
+                        <ul className="space-y-2">
+                          {workout.exercises && workout.exercises.map((exercise, index) => (
+                            <li key={index} className="bg-gray-800 p-2 rounded">
+                              <span className="font-medium text-white">{exercise.name}</span>
+                              <div className="text-sm text-gray-400">
+                                {exercise.sets && exercise.sets !== "AMRAP" && <span>Sets: {exercise.sets} </span>}
+                                {exercise.reps && <span>× {exercise.reps} </span>}
+                                {exercise.weight && <span>@ {exercise.weight} </span>}
+                                {exercise.distance && <span>Distance: {exercise.distance} </span>}
+                                {exercise.duration && <span>Duration: {exercise.duration}</span>}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      
+                      {workout.scalingOptions && workout.scalingOptions.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-white mb-2">Scaling Options:</h4>
+                          <ul className="text-sm text-gray-400">
+                            {workout.scalingOptions.map((option, index) => (
+                              <li key={index} className="mb-1">
+                                <span className="text-gray-300">{option.level}:</span> {option.modifications}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      <div className="text-xs text-gray-500 mt-4">
+                        Source: {workout.source || 'Custom'}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center text-gray-500 py-12">
+                    No workouts found. Try adjusting your filters or use AI Workout Search to create new workouts.
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -1371,6 +1719,138 @@ const getYouTubeThumbnail = (url) => {
                 <p className="text-center text-gray-400 py-10">
                   No duplicate exercises found!
                 </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Workout Search Modal - ADDING IT HERE */}
+      {showWorkoutSearchModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-900 rounded-lg w-full max-w-4xl border border-gray-800">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white">Find Workouts</h2>
+              <button
+                className="text-gray-400 hover:text-white"
+                onClick={() => setShowWorkoutSearchModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-300 mb-4">
+                Search for workouts by type and keywords. Our AI will suggest relevant workouts.
+              </p>
+
+              <div className="flex flex-col gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Workout Type
+                  </label>
+                  <select
+                    className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white"
+                    value={workoutType}
+                    onChange={(e) => setWorkoutType(e.target.value)}
+                  >
+                    <option value="crossfit">CrossFit</option>
+                    <option value="strength">Strength Training</option>
+                    <option value="hiit">HIIT</option>
+                    <option value="bodybuilding">Bodybuilding</option>
+                    <option value="powerlifting">Powerlifting</option>
+                    <option value="weightlifting">Olympic Weightlifting</option>
+                    <option value="hyrox">Hyrox</option>
+                    <option value="endurance">Endurance</option>
+                    <option value="functional">Functional Training</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Search Terms
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="E.g., 'beginner', 'upper body', 'quick'"
+                      className="flex-1 p-2 bg-gray-800 border border-gray-700 rounded text-white"
+                      value={workoutSearchTerm}
+                      onChange={(e) => setWorkoutSearchTerm(e.target.value)}
+                    />
+                    <button
+                      className={`bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded ${(workoutSearchLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={handleWorkoutSearch}
+                      disabled={workoutSearchLoading}
+                    >
+                      {workoutSearchLoading ? 'Searching...' : 'Search'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {workoutSearchResults.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-medium text-white mb-3">Results ({workoutSearchResults.length})</h3>
+                  <div className="max-h-96 overflow-y-auto pr-2">
+                    {workoutSearchResults.map((workout, index) => (
+                      <div key={index} className="bg-gray-800 rounded p-4 mb-3 border border-gray-700">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium text-white text-lg">{workout.name}</h4>
+                            <p className="text-gray-300 text-sm mt-1">{workout.description}</p>
+                          </div>
+                          <button
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-sm"
+                            onClick={() => saveWorkout(workout)}
+                          >
+                            Save Workout
+                          </button>
+                        </div>
+
+                        <div className="mt-3">
+                          <h5 className="font-medium text-orange-500 text-sm mb-2">Exercises:</h5>
+                          <ul className="list-disc list-inside text-gray-300 text-sm space-y-1">
+                            {workout.exercises.map((exercise, i) => (
+                              <li key={i}>
+                                <span className="font-medium">{exercise.name}</span>
+                                {exercise.sets && exercise.sets !== "AMRAP" && <span> - {exercise.sets} sets</span>}
+                                {exercise.reps && <span> × {exercise.reps}</span>}
+                                {exercise.weight && <span> @ {exercise.weight}</span>}
+                                {exercise.distance && <span> - {exercise.distance}</span>}
+                                {exercise.duration && <span> - {exercise.duration}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className="bg-gray-700 text-indigo-300 text-xs px-2 py-1 rounded">
+                            {workout.difficulty || 'Intermediate'}
+                          </span>
+                          <span className="bg-gray-700 text-orange-300 text-xs px-2 py-1 rounded">
+                            {workout.duration || workout.estimatedTime || '30-45 min'}
+                          </span>
+                          <span className="bg-gray-700 text-green-300 text-xs px-2 py-1 rounded">
+                            {workout.type || workoutType.charAt(0).toUpperCase() + workoutType.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {workoutSearchLoading && (
+                <div className="text-center py-10">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                  <p className="mt-2 text-indigo-400">Searching for workouts...</p>
+                </div>
+              )}
+
+              {!workoutSearchLoading && workoutSearchResults.length === 0 && workoutSearchTerm && (
+                <div className="text-center py-10 text-gray-400">
+                  No workouts found. Try different search terms.
+                </div>
               )}
             </div>
           </div>
