@@ -209,12 +209,28 @@ app.get('/api/health', (req, res) => {
 
 // Add a debug info endpoint to see environment values
 app.get('/api/debug-info', (req, res) => {
+  // Check for client/build directory
+  const clientBuildPath = path.join(__dirname, '../../client/build');
+  const indexPath = path.join(clientBuildPath, 'index.html');
+  
+  // List files in directories
+  let clientBuildFiles = [];
+  try {
+    if (fs.existsSync(clientBuildPath)) {
+      clientBuildFiles = fs.readdirSync(clientBuildPath);
+    }
+  } catch (err) {
+    console.error('Error reading client/build directory:', err);
+  }
+
   res.status(200).json({
     environment: process.env.NODE_ENV,
     dirname: __dirname,
-    clientBuildPath: path.join(__dirname, '../../client/build'),
-    clientBuildExists: fs.existsSync(path.join(__dirname, '../../client/build')),
-    clientIndexExists: fs.existsSync(path.join(__dirname, '../../client/build/index.html'))
+    clientBuildPath: clientBuildPath,
+    clientBuildExists: fs.existsSync(clientBuildPath),
+    clientIndexExists: fs.existsSync(indexPath),
+    clientBuildFiles: clientBuildFiles,
+    port: process.env.PORT
   });
 });
 
@@ -222,7 +238,24 @@ app.get('/api/debug-info', (req, res) => {
 app.get('/', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     console.log('Serving React app from root in production');
-    res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
+    const indexPath = path.join(__dirname, '../../client/build/index.html');
+    
+    // Check if index.html exists
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      // Fallback if index.html doesn't exist
+      res.send(`
+        <html>
+          <head><title>Prometheus Library</title></head>
+          <body>
+            <h1>Prometheus Library API is running</h1>
+            <p>The React frontend could not be found.</p>
+            <p>Please check build configurations or <a href="/api/debug-info">Debug Info</a>.</p>
+          </body>
+        </html>
+      `);
+    }
   } else {
     res.send('Prometheus Exercise Library API is running');
   }

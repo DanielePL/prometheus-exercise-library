@@ -4,13 +4,13 @@ services:
     name: prometheus-server
     env: node
     plan: free
-    buildCommand: npm install && cd client && npm install && npm run build && cd .. && cd server && npm install
-    startCommand: node server/src/index.js
+    buildCommand: npm install && cd client && npm install && npm run build && cd .. && cd server && npm install && ls -la client/build
+    startCommand: node verify-build.js && node server/src/index.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3001
+        value: 10000
       - key: MONGODB_URI
         sync: false
       - key: OPENAI_API_KEY

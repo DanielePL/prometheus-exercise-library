@@ -9,6 +9,7 @@
     "dev-all": "concurrently \"npm run dev\" \"cd client && npm start\"",
     "client": "cd client && npm start",
     "build": "cd client && npm install && npm run build && cd .. && cd server && npm install",
+    "verify": "node verify-build.js",
     "heroku-postbuild": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
     "crawl": "node crawlers/index.js",
