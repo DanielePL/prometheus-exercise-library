@@ -8,6 +8,7 @@ const axios = require('axios');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const app = express();
 
@@ -201,9 +202,30 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Root route
+// Health check endpoint for Render
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
+
+// Add a debug info endpoint to see environment values
+app.get('/api/debug-info', (req, res) => {
+  res.status(200).json({
+    environment: process.env.NODE_ENV,
+    dirname: __dirname,
+    clientBuildPath: path.join(__dirname, '../../client/build'),
+    clientBuildExists: fs.existsSync(path.join(__dirname, '../../client/build')),
+    clientIndexExists: fs.existsSync(path.join(__dirname, '../../client/build/index.html'))
+  });
+});
+
+// Root route - change to redirect to frontend in production
 app.get('/', (req, res) => {
-  res.send('Prometheus Exercise Library API is running');
+  if (process.env.NODE_ENV === 'production') {
+    console.log('Redirecting to React app from root endpoint');
+    res.redirect('/app');
+  } else {
+    res.send('Prometheus Exercise Library API is running');
+  }
 });
 
 app.post('/api/exercises', async (req, res) => {
@@ -996,18 +1018,15 @@ app.get('/api/user', authenticate, async (req, res) => {
   }
 });
 
-// Health check endpoint for Render
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
-});
-
 // Serve static files from the React app in production
 if (process.env.NODE_ENV === 'production') {
+  console.log('Setting up static file serving for production');
   // Serve static files from the React frontend app
-  app.use(express.static(path.join(__dirname, '../../client/build')));
+  app.use('/app', express.static(path.join(__dirname, '../../client/build')));
 
   // Handle React routing, return all requests to React app
-  app.get('*', (req, res) => {
+  app.get('/app/*', (req, res) => {
+    console.log('Serving React app for path:', req.path);
     res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
   });
 }
