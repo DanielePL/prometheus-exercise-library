@@ -237,26 +237,38 @@ app.get('/api/debug-info', (req, res) => {
 // Root route - should serve API info in development, React app in production
 app.get('/', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
-    console.log('Serving React app from root in production');
+    console.log('Trying to serve React app from root in production');
     const indexPath = path.join(__dirname, '../../client/build/index.html');
     const fallbackPath = path.join(__dirname, '../../client/public/index-fallback.html');
+    const emergencyFallbackPath = path.join(__dirname, '../../fallback.html');
     
-    // Check if index.html exists
+    // Check files in order of preference
     if (fs.existsSync(indexPath)) {
+      console.log('Serving client/build/index.html');
       res.sendFile(indexPath);
     } else if (fs.existsSync(fallbackPath)) {
-      // Use fallback if available
-      console.log('Using fallback HTML');
+      console.log('Serving client/public/index-fallback.html');
       res.sendFile(fallbackPath);
+    } else if (fs.existsSync(emergencyFallbackPath)) {
+      console.log('Serving emergency fallback.html');
+      res.sendFile(emergencyFallbackPath);
     } else {
-      // Plain HTML fallback if neither file exists
+      // Last resort inline HTML
+      console.log('Serving inline HTML fallback');
       res.send(`
         <html>
-          <head><title>Prometheus Library</title></head>
-          <body style="font-family: sans-serif; background-color: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center;">
-            <h1 style="color: #ff5722; font-size: 32px;">Prometheus Library API</h1>
+          <head>
+            <title>Prometheus Library</title>
+            <style>
+              body { font-family: sans-serif; background-color: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center; }
+              h1 { color: #ff5722; font-size: 32px; }
+              a { color: #ff5722; }
+            </style>
+          </head>
+          <body>
+            <h1>Prometheus Library API</h1>
             <p>The React frontend could not be found.</p>
-            <p>Please check build configurations or <a href="/api/debug-info" style="color: #ff5722;">Debug Info</a>.</p>
+            <p>Please check build configurations or <a href="/api/debug-info">Debug Info</a>.</p>
           </body>
         </html>
       `);

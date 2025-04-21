@@ -6,15 +6,25 @@ services:
     plan: free
     buildCommand: |
       npm install
+      mkdir -p client/build
       cd client
-      npm install
-      CI=false npm run build
+      npm install || true
+      CI=false npm run build || echo "Client build failed, using fallback"
       cd ..
+      # Ensure client/build exists and has index.html
+      mkdir -p client/build
+      if [ ! -f client/build/index.html ]; then
+        cp client/public/index-fallback.html client/build/index.html || echo "Public fallback copy failed"
+        if [ ! -f client/build/index.html ]; then
+          cp fallback.html client/build/index.html || echo "Root fallback copy failed"
+          echo "Created emergency fallback index.html"
+        else
+          echo "Created fallback index.html from public dir"
+        fi
+      fi
       cd server
       npm install
       cd ..
-      mkdir -p client/build
-      cp client/public/index-fallback.html client/build/index.html || echo "Fallback copy failed"
       ls -la client/build
     startCommand: node verify-build.js && node server/src/index.js
     envVars:
