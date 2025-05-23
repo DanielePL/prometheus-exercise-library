@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Grundlegende Styles um sicherzustellen, dass der Inhalt sichtbar ist */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: white;
+  color: black;
+}
+
+/* Debugging-Hilfe - zeigt Grenzen von Elementen an */
+.debug * {
+  outline: 1px solid red;
+}

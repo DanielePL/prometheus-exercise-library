@@ -1,0 +1,51 @@
+{
+  "name": "prometheus-server",
+  "version": "1.0.0",
+  "description": "Backend server for Prometheus Exercise Library",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "seed": "node scripts/seed.js",
+    "backup": "node scripts/backup.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^7.5.0",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5",
+    "cors": "^2.8.5",
+    "axios": "^1.5.0",
+    "dotenv": "^16.3.1",
+    "helmet": "^7.0.0",
+    "express-rate-limit": "^6.10.0",
+    "express-validator": "^7.0.1",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "sharp": "^0.32.5",
+    "node-cron": "^3.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "@types/jest": "^29.5.5"
+  },
+  "keywords": [
+    "fitness",
+    "exercise",
+    "library",
+    "prometheus",
+    "workout",
+    "training"
+  ],
+  "author": "Prometheus Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
